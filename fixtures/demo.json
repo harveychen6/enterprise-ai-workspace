@@ -1,0 +1,52 @@
+{
+  "profile": {
+    "name": "林清和",
+    "headline": "后端工程师",
+    "years": "5 年经验",
+    "location": "上海",
+    "phone": "136-0000-0000",
+    "email": "linqinghe@example.com",
+    "links": "github.com/linqh",
+    "summary": "5 年后端研发经验，长期负责高并发交易与稳定性体系建设。",
+    "education": "华东理工大学 · 计算机科学与技术 · 本科 · 2017 - 2021",
+    "skills": ["Java", "Go", "Redis", "MySQL", "Prometheus / Grafana"]
+  },
+  "projects": [
+    {
+      "id": "demo-monitor",
+      "title": "服务监控告警治理专项",
+      "status": "done",
+      "tags": ["Prometheus", "Grafana", "SLO"],
+      "org": "核心平台组",
+      "periodStart": "2026.06",
+      "periodEnd": "2026.10",
+      "factsMarkdown": "背景：值班群日均 400+ 告警。\n行动：盘点 12 个核心服务的 340+ 条规则，按 SLO 重配阈值。\n结果：日均无效告警 430 降至 78，误报率下降约 62%。\n证据：Grafana 看板、Git commit a41f9c2。",
+      "todos": "",
+      "resumeBullet": "主导 12 个核心服务的告警治理：梳理 340+ 条规则，将日均无效告警由 430 条降至 78 条，误报率下降约 62%。"
+    },
+    {
+      "id": "demo-order",
+      "title": "订单结算链路重构（二期）",
+      "status": "active",
+      "tags": ["Java", "Spring Cloud"],
+      "org": "交易中台",
+      "periodStart": "2026.09",
+      "periodEnd": "至今",
+      "factsMarkdown": "行动：拆出促销计算，已完成 30% 灰度，目前无资损。\n证据：灰度发布单 #RE-2241。",
+      "todos": "全量上线时间尚未确定，不能写已上线",
+      "resumeBullet": "推进订单结算链路重构（进行中）：已完成 30% 灰度流量切换且无资损。"
+    },
+    {
+      "id": "demo-k8s",
+      "title": "K8s 集群迁移与可观测性升级",
+      "status": "planned",
+      "tags": ["Kubernetes", "Prometheus"],
+      "org": "",
+      "periodStart": "",
+      "periodEnd": "",
+      "factsMarkdown": "计划迁移至托管 Kubernetes，并接入统一日志与链路追踪。尚未开始执行。",
+      "todos": "方案未评审\n排期未对齐",
+      "resumeBullet": "筹备「K8s 集群迁移与可观测性升级」（计划中，尚未执行）。"
+    }
+  ]
+}
