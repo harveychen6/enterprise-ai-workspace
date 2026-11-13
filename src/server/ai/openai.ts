@@ -1,25 +1,38 @@
+import { chatCompletionsUrl, modelSupportsJsonMode, resolveModel } from '@/server/ai/endpoint'
 import { keywordUserPrompt, proposeUserPrompt, refineUserPrompt, reasonUserPrompt, SYSTEM_PROMPT } from '@/server/ai/prompts'
 import type { AiClient, BulletInput, ReasonInput } from '@/server/ai/types'
 
 async function complete(user: string): Promise<string> {
-  const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
-  const response = await fetch(`${base}/chat/completions`, {
+  const model = resolveModel(process.env.OPENAI_MODEL)
+  const body: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: user },
+    ],
+  }
+  if (modelSupportsJsonMode(model)) {
+    body.temperature = 0.2
+    body.response_format = { type: 'json_object' }
+  }
+  const response = await fetch(chatCompletionsUrl(process.env.OPENAI_BASE_URL), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
-      temperature: 0.2,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: user },
-      ],
-    }),
+    body: JSON.stringify(body),
   })
   if (!response.ok) {
-    throw new Error(`模型请求失败（${response.status}）`)
+    const detail = await response.text()
+    let message = ''
+    try {
+      const parsed = JSON.parse(detail) as { error?: { message?: string } }
+      message = parsed.error?.message ?? ''
+    } catch {
+      message = detail.slice(0, 180)
+    }
+    throw new Error(message ? `模型请求失败（${response.status}）：${message}` : `模型请求失败（${response.status}）`)
   }
   const payload = await response.json() as { choices?: { message?: { content?: string } }[] }
   const content = payload.choices?.[0]?.message?.content

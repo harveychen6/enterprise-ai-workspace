@@ -8,7 +8,6 @@ import { api, notifyChanged } from '@/lib/api'
 
 interface Meta {
   aiAvailable: boolean
-  profile: { name: string; headline: string }
   projectCount: number
   jobCount: number
   completeness: number | null
@@ -76,7 +75,7 @@ export function Sidebar() {
         </div>
         {!meta?.aiAvailable && <p className="mt-2 text-[11px] leading-5 text-[#8290a6]">{copy.aiMissing}</p>}
       </div>
-      <div className="mx-3 mt-3 space-y-2 text-[12px]">
+      <div className="mx-3 mt-auto space-y-2 p-3 text-[12px]">
         <label className="block text-[11px] text-[#7c8899]">
           {copy.syncInterval}
           <input className="mt-1 h-8 w-full rounded-lg border border-[#e2e8f0] px-2" type="number" min={1} value={days} onChange={(event) => setDays(Number(event.target.value))} onBlur={() => void api('/api/settings', { method: 'PATCH', body: JSON.stringify({ syncIntervalDays: days }) })} />
@@ -96,10 +95,6 @@ export function Sidebar() {
             }} />
           </label>
         </div>
-      </div>
-      <div className="mt-auto border-t border-[#eef1f6] p-3">
-        <p className="truncate text-[12.5px] font-medium">{meta?.profile.name || copy.emptyName}</p>
-        <p className="truncate text-[10.5px] text-[#9aa7ba]">{meta?.profile.headline || copy.tagline}</p>
       </div>
     </aside>
   )

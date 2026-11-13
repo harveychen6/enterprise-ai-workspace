@@ -3,6 +3,7 @@
 import { DndContext, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { copy } from '@/content/zh-CN'
+import { isOngoing, toMonthInput } from '@/domain/period'
 import { api, notifyChanged, statusLabel } from '@/lib/api'
 
 type Status = 'planned' | 'active' | 'done'
@@ -64,6 +65,12 @@ export function ProjectBoard() {
   })
   const pendingCount = proposals.filter((item) => item.proposalStatus === 'pending').length
 
+  async function removeProject(id: string) {
+    await api(`/api/projects/${id}`, { method: 'DELETE' })
+    if (openId === id) setOpenId(null)
+    await reload()
+  }
+
   async function onDragEnd(event: DragEndEvent) {
     const status = event.over?.id
     if (!event.active.id || (status !== 'planned' && status !== 'active' && status !== 'done')) return
@@ -110,7 +117,13 @@ export function ProjectBoard() {
         <DndContext sensors={sensors} onDragEnd={(event) => void onDragEnd(event)}>
           <section className="grid min-h-0 flex-1 grid-cols-3 gap-4 px-6 pb-5">
             {COLUMNS.map((status) => (
-              <Column key={status} status={status} projects={visible.filter((project) => project.status === status)} onOpen={setOpenId} />
+              <Column
+                key={status}
+                status={status}
+                projects={visible.filter((project) => project.status === status)}
+                onOpen={setOpenId}
+                onDelete={(id) => void removeProject(id)}
+              />
             ))}
           </section>
         </DndContext>
@@ -130,7 +143,7 @@ export function ProjectBoard() {
   )
 }
 
-function Column({ status, projects, onOpen }: { status: Status; projects: Project[]; onOpen: (id: string) => void }) {
+function Column({ status, projects, onOpen, onDelete }: { status: Status; projects: Project[]; onOpen: (id: string) => void; onDelete: (id: string) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   return (
     <div className={`flex min-h-0 flex-col rounded-2xl border bg-[#f0f3f8] ${isOver ? 'border-[#9dbcf7]' : 'border-[#e7ebf2]'}`}>
@@ -140,13 +153,13 @@ function Column({ status, projects, onOpen }: { status: Status; projects: Projec
         <span className="rounded border border-[#e3e8f0] bg-white px-1.5 text-[10.5px] font-normal text-[#8b98ab]">{projects.length}</span>
       </div>
       <div ref={setNodeRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-2.5 pb-3">
-        {projects.map((project) => <Card key={project.id} project={project} onOpen={onOpen} />)}
+        {projects.map((project) => <Card key={project.id} project={project} onOpen={onOpen} onDelete={onDelete} />)}
       </div>
     </div>
   )
 }
 
-function Card({ project, onOpen }: { project: Project; onOpen: (id: string) => void }) {
+function Card({ project, onOpen, onDelete }: { project: Project; onOpen: (id: string) => void; onDelete: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: project.id })
   const excerpt = project.factsMarkdown.split('\n').map((line) => line.trim()).find(Boolean) ?? ''
   return (
@@ -165,9 +178,16 @@ function Card({ project, onOpen }: { project: Project; onOpen: (id: string) => v
       <div className="mt-2 flex flex-wrap gap-1.5">
         {project.tags.map((tag) => <span key={tag} className="rounded border border-[#e8ecf3] bg-[#f4f6f9] px-1.5 text-[10px] text-[#6f7c90]">{tag}</span>)}
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10.5px]">
-        <span style={{ color: DOT[project.status] }}>{statusLabel(project.status)}</span>
+      <div className="mt-2 flex items-center justify-end gap-2 text-[10.5px]">
         {project.todoCount > 0 && <span className="rounded border border-[#f5e6c3] bg-[#fffaef] px-1.5 text-[#b98217]">{project.todoCount} 个待补问题</span>}
+        <button
+          className="rounded px-1.5 py-0.5 text-[#9aa7ba] hover:bg-[#fdecec] hover:text-[#c24141]"
+          onClick={(event) => {
+            event.stopPropagation()
+            if (!window.confirm(copy.deleteProjectConfirm(project.title))) return
+            onDelete(project.id)
+          }}
+        >{copy.deleteProject}</button>
       </div>
     </article>
   )
@@ -234,18 +254,40 @@ function Drawer({ project, aiAvailable, onClose, onSaved }: { project: Project |
             <span className="h-2 w-2 rounded-full" style={{ background: DOT[draft.status] }} />
             <span>{statusLabel(draft.status)}</span>
             <span className="ml-auto text-[#0d8a6c]">{saveText}</span>
+            <button className="rounded-md px-2 py-1 text-[12px] text-[#546074] hover:bg-[#f4f6f9]" type="button" onClick={onClose}>{copy.close}</button>
           </div>
-          <input className="mt-2 w-full text-[17px] font-semibold outline-none" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
-          <input className="mt-2 w-full rounded-lg border border-[#e2e8f0] px-2 py-1 text-[12px]" placeholder={copy.tagsHint} value={draft.tags.join(', ')} onChange={(event) => setDraft({ ...draft, tags: event.target.value.split(/[,，]/).map((item) => item.trim()).filter(Boolean) })} />
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <input className="rounded-lg border border-[#e2e8f0] px-2 py-1 text-[12px]" placeholder={copy.org} value={draft.org} onChange={(event) => setDraft({ ...draft, org: event.target.value })} />
-            <input className="rounded-lg border border-[#e2e8f0] px-2 py-1 text-[12px]" placeholder={copy.periodStart} value={draft.periodStart} onChange={(event) => setDraft({ ...draft, periodStart: event.target.value })} />
-            <input className="rounded-lg border border-[#e2e8f0] px-2 py-1 text-[12px]" placeholder={copy.periodEnd} value={draft.periodEnd} onChange={(event) => setDraft({ ...draft, periodEnd: event.target.value })} />
+          <label className="mt-3 block">
+            <span className="text-[11.5px] font-medium text-[#4a5668]">{copy.projectName}</span>
+            <input className="mt-1.5 h-9 w-full rounded-lg border border-[#e2e8f0] px-2 text-[14px] font-semibold" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+          </label>
+          <label className="mt-3 block">
+            <span className="text-[11.5px] font-medium text-[#4a5668]">{copy.tags}</span>
+            <input className="mt-1.5 h-9 w-full rounded-lg border border-[#e2e8f0] px-2 text-[12px]" placeholder={copy.tagsHint} value={draft.tags.join(', ')} onChange={(event) => setDraft({ ...draft, tags: event.target.value.split(/[,，]/).map((item) => item.trim()).filter(Boolean) })} />
+          </label>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <label className="block">
+              <span className="text-[11.5px] font-medium text-[#4a5668]">{copy.org}</span>
+              <input className="mt-1.5 h-9 w-full rounded-lg border border-[#e2e8f0] px-2 text-[12px]" value={draft.org} onChange={(event) => setDraft({ ...draft, org: event.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-[11.5px] font-medium text-[#4a5668]">{copy.periodStart}</span>
+              <input className="mt-1.5 h-9 w-full rounded-lg border border-[#e2e8f0] px-2 text-[12px]" type="month" value={toMonthInput(draft.periodStart)} onChange={(event) => setDraft({ ...draft, periodStart: event.target.value })} />
+            </label>
+            <div>
+              <label className="block">
+                <span className="text-[11.5px] font-medium text-[#4a5668]">{copy.periodEnd}</span>
+                <input className="mt-1.5 h-9 w-full rounded-lg border border-[#e2e8f0] px-2 text-[12px] disabled:bg-[#f4f6f9]" type="month" disabled={isOngoing(draft.periodEnd)} value={isOngoing(draft.periodEnd) ? '' : toMonthInput(draft.periodEnd)} onChange={(event) => setDraft({ ...draft, periodEnd: event.target.value })} />
+              </label>
+              <label className="mt-1 flex items-center gap-1 text-[11px] text-[#7c8899]">
+                <input type="checkbox" checked={isOngoing(draft.periodEnd)} onChange={(event) => setDraft({ ...draft, periodEnd: event.target.checked ? '至今' : '' })} />
+                {copy.ongoing}
+              </label>
+            </div>
           </div>
         </div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <label className="block text-[12px] font-medium">
-            {copy.statusPlanned === '计划中' ? '状态' : '状态'}
+            {copy.status}
             <select className="mt-1 h-9 w-full rounded-lg border border-[#e2e8f0] px-2" value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as Status })}>
               {COLUMNS.map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
             </select>
@@ -273,7 +315,10 @@ function Drawer({ project, aiAvailable, onClose, onSaved }: { project: Project |
               }}>{refining ? copy.refining : copy.refine}</button>
             </div>
             {!aiAvailable && <p className="mt-1 text-[11px] text-[#9aa7ba]">{copy.aiOffRefine}</p>}
-            <textarea className="mt-2 h-28 w-full rounded-lg border border-[#dbe6ff] p-2 text-[12.5px]" value={draft.resumeBullet} onChange={(event) => setDraft({ ...draft, resumeBullet: event.target.value })} />
+            <label className="mt-2 block">
+              <span className="sr-only">{copy.bullet}</span>
+              <textarea className="h-28 w-full rounded-lg border border-[#dbe6ff] p-2 text-[12.5px]" value={draft.resumeBullet} onChange={(event) => setDraft({ ...draft, resumeBullet: event.target.value })} />
+            </label>
           </div>
         </div>
       </aside>

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { exportBackup, importBackup } from '@/server/backup'
 import { resetDbForTests } from '@/server/db'
 import { createJob } from '@/server/jobs'
-import { createProject, getProject, refineProject, updateProject } from '@/server/projects'
+import { createProject, deleteProject, getProject, refineProject, updateProject } from '@/server/projects'
 import { generateTargetedResume, getResume, listResumes, updateResume } from '@/server/resumes'
 import { listPendingProposals } from '@/server/sync'
 
@@ -53,6 +53,14 @@ describe('工作台服务', () => {
     await updateProject(project.id, { status: 'done' })
     const pending = await listPendingProposals()
     expect(pending.some((item) => item.projectId === project.id && item.proposalStatus === 'pending')).toBe(true)
+  })
+
+  it('删除项目后，简历条目和项目本身都不再存在', async () => {
+    const project = createProject('待删除')
+    await updateProject(project.id, { factsMarkdown: '只是一条记录', resumeBullet: '句子' })
+    expect(deleteProject(project.id)).toBe(true)
+    expect(getProject(project.id)).toBeNull()
+    expect(deleteProject(project.id)).toBe(false)
   })
 
   it('全量备份可以导回', async () => {

@@ -21,15 +21,17 @@ Windows 上如果 `better-sqlite3` 编译失败，先安装 Visual Studio Build 
 
 ## 模型
 
-在 `.env.local` 中填写：
+默认对接 DeepSeek 的 OpenAI 兼容接口。在 `.env.local` 中填写：
 
 ```bash
-OPENAI_BASE_URL=https://api.openai.com/v1
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.deepseek.com
+OPENAI_API_KEY=你的 DeepSeek 密钥
+OPENAI_MODEL=deepseek-chat
 ```
 
-不填写密钥时，看板、编辑、Markdown 导出和 PDF 打印仍然可用。提炼、关键词和合并候选句会提示未配置模型。
+`OPENAI_BASE_URL` 可以写成 `https://api.deepseek.com` 或 `https://api.deepseek.com/v1`。未填写 `OPENAI_MODEL` 时使用 `deepseek-chat`。`deepseek-chat` 会要求模型返回 JSON；`deepseek-reasoner` 不使用 JSON 模式。
+
+其他兼容 OpenAI Chat Completions 的服务，改这三项即可。不填写密钥时，看板、编辑、Markdown 导出和 PDF 打印仍然可用。提炼、关键词和合并候选句会提示未配置模型。
 
 `AI_PROVIDER=fake` 使用本地假模型，不访问网络，只适合开发和测试。
 

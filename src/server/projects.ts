@@ -4,7 +4,7 @@ import type { ProjectStatus } from '@/domain/score'
 import { shouldQueueOnStatusChange } from '@/domain/sync'
 import { getAiClient } from '@/server/ai/client'
 import { getDb } from '@/server/db'
-import { projects } from '@/server/db/schema'
+import { jobMatches, projects, resumeItems, syncProposals } from '@/server/db/schema'
 import { newId, nowIso, parseTags } from '@/server/ids'
 import { proposeForProject } from '@/server/sync'
 
@@ -40,6 +40,17 @@ export function createProject(title: string) {
   }
   getDb().insert(projects).values(row).run()
   return toProject(row)
+}
+
+export function deleteProject(id: string): boolean {
+  const current = getDb().select().from(projects).where(eq(projects.id, id)).get()
+  if (!current) return false
+  const db = getDb()
+  db.delete(resumeItems).where(eq(resumeItems.projectId, id)).run()
+  db.delete(syncProposals).where(eq(syncProposals.projectId, id)).run()
+  db.delete(jobMatches).where(eq(jobMatches.projectId, id)).run()
+  db.delete(projects).where(eq(projects.id, id)).run()
+  return true
 }
 
 export async function updateProject(id: string, patch: {
