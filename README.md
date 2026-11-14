@@ -52,3 +52,5 @@ npm test
 - [产品需求](docs/requirements/product.md)
 - [开源交付需求](docs/requirements/delivery.md)
 - [技术方案](docs/careerdesk-mvp-design.md)
+- [轻量服务器部署](docs/deploy-lighthouse.md)
+- [更新记录](CHANGELOG.md)

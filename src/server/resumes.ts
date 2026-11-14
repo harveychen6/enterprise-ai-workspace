@@ -50,6 +50,8 @@ export function getResume(id: string) {
       links: person.links,
       education: person.education,
       skills: parseSkills(person.skillsJson),
+      workExperience: person.workExperience,
+      photo: person.photo,
     } : null,
     projects: projectRows.map((project) => {
       const item = itemByProject.get(project.id)
@@ -174,8 +176,8 @@ export function renderMarkdown(id: string): string | null {
     [person.headline, person.years].filter(Boolean).join(' · '),
     [person.location, person.phone, person.email, person.links].filter(Boolean).join(' · '),
     '',
-    '## 个人简介',
-    resume.summary,
+    '## 工作经历',
+    person.workExperience,
     '',
     '## 项目经历',
   ]
@@ -183,6 +185,6 @@ export function renderMarkdown(id: string): string | null {
     const period = [project.periodStart, project.periodEnd].filter(Boolean).join(' — ')
     lines.push(`### ${project.title}`, [project.org, period].filter(Boolean).join(' · '), project.bullet, '')
   }
-  lines.push('## 技术栈', person.skills.join('、'), '', '## 教育经历', person.education)
+  lines.push('## 专业技能', ...person.skills, '', '## 教育背景', person.education)
   return lines.filter((line, index, all) => !(line === '' && all[index - 1] === '')).join('\n')
 }

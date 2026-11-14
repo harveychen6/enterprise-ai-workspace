@@ -12,6 +12,8 @@ export const profile = sqliteTable('profile', {
   summary: text('summary').notNull(),
   education: text('education').notNull(),
   skillsJson: text('skills_json').notNull(),
+  workExperience: text('work_experience').notNull().default(''),
+  photo: text('photo').notNull().default(''),
 })
 
 export const projects = sqliteTable('projects', {

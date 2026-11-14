@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isOngoing, toMonthInput } from '@/domain/period'
+import { formatResumePeriod, isOngoing, toMonthInput } from '@/domain/period'
 
 describe('项目时间', () => {
   it('把年月文本转成月份选择器的值', () => {
@@ -7,5 +7,6 @@ describe('项目时间', () => {
     expect(toMonthInput('2026-10')).toBe('2026-10')
     expect(toMonthInput('至今')).toBe('')
     expect(isOngoing('至今')).toBe(true)
+    expect(formatResumePeriod('2026.06', '至今')).toBe('2026.06 - 至今')
   })
 })

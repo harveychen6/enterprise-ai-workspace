@@ -161,13 +161,49 @@ function Column({ status, projects, onOpen, onDelete }: { status: Status; projec
 
 function Card({ project, onOpen, onDelete }: { project: Project; onOpen: (id: string) => void; onDelete: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: project.id })
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [confirm, setConfirm] = useState(false)
+  const iconRef = useRef<HTMLButtonElement>(null)
   const excerpt = project.factsMarkdown.split('\n').map((line) => line.trim()).find(Boolean) ?? ''
+
+  useEffect(() => {
+    if (!menu && !confirm) return
+    const close = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (iconRef.current?.contains(target)) return
+      const panel = document.getElementById(`project-delete-${project.id}`)
+      if (panel?.contains(target)) return
+      setMenu(null)
+      setConfirm(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenu(null)
+        setConfirm(false)
+      }
+    }
+    const timer = window.setTimeout(() => window.addEventListener('mousedown', close), 0)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [menu, confirm, project.id])
+
   return (
     <article
       ref={setNodeRef}
-      className="cursor-pointer rounded-xl border border-[#e6eaf1] bg-white p-3.5 shadow-sm"
+      className="relative cursor-pointer rounded-xl border border-[#e6eaf1] bg-white p-3.5 shadow-sm"
       style={{ transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, opacity: isDragging ? 0.45 : 1 }}
       onClick={() => onOpen(project.id)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        setConfirm(false)
+        setMenu({ x: event.clientX, y: event.clientY })
+      }}
     >
       <div className="flex gap-2">
         <h3 className="flex-1 text-[13.5px] font-semibold">{project.title}</h3>
@@ -179,17 +215,63 @@ function Card({ project, onOpen, onDelete }: { project: Project; onOpen: (id: st
         {project.tags.map((tag) => <span key={tag} className="rounded border border-[#e8ecf3] bg-[#f4f6f9] px-1.5 text-[10px] text-[#6f7c90]">{tag}</span>)}
       </div>
       <div className="mt-2 flex items-center justify-end gap-2 text-[10.5px]">
-        {project.todoCount > 0 && <span className="rounded border border-[#f5e6c3] bg-[#fffaef] px-1.5 text-[#b98217]">{project.todoCount} 个待补问题</span>}
+        {project.todoCount > 0 && <span className="mr-auto rounded border border-[#f5e6c3] bg-[#fffaef] px-1.5 text-[#b98217]">{project.todoCount} 个待补问题</span>}
         <button
-          className="rounded px-1.5 py-0.5 text-[#9aa7ba] hover:bg-[#fdecec] hover:text-[#c24141]"
+          ref={iconRef}
+          className="rounded p-1 text-[#9aa7ba] hover:bg-[#fdecec] hover:text-[#c24141]"
+          aria-label={copy.deleteProject}
           onClick={(event) => {
+            event.preventDefault()
             event.stopPropagation()
-            if (!window.confirm(copy.deleteProjectConfirm(project.title))) return
-            onDelete(project.id)
+            setMenu(null)
+            setConfirm(true)
           }}
-        >{copy.deleteProject}</button>
+        >
+          <TrashIcon />
+        </button>
       </div>
+      {menu && (
+        <div id={`project-delete-${project.id}`} className="fixed z-30 min-w-28 rounded-lg border border-[#e6eaf1] bg-white py-1 shadow-lg" style={{ left: menu.x, top: menu.y }} onClick={(event) => event.stopPropagation()}>
+          <button
+            className="block w-full px-3 py-1.5 text-left text-[12.5px] text-[#c24141] hover:bg-[#fdecec]"
+            onClick={() => {
+              setMenu(null)
+              setConfirm(true)
+            }}
+          >{copy.deleteProject}</button>
+        </div>
+      )}
+      {confirm && (
+        <div
+          id={`project-delete-${project.id}`}
+          className="fixed z-40 w-56 rounded-lg border border-[#e6eaf1] bg-white p-3 text-left shadow-lg"
+          style={{ ...confirmStyle(iconRef.current), transform: 'translateY(-100%)' }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <p className="text-[12px] leading-5 text-[#3d4a5e]">{copy.deleteProjectConfirm(project.title)}</p>
+          <div className="mt-2 flex justify-end gap-2">
+            <button className="h-7 rounded-md border border-[#e2e8f0] px-2 text-[12px] text-[#546074]" onClick={() => setConfirm(false)}>{copy.cancel}</button>
+            <button className="h-7 rounded-md bg-[#c24141] px-2 text-[12px] text-white" onClick={() => onDelete(project.id)}>{copy.confirmDelete}</button>
+          </div>
+        </div>
+      )}
     </article>
+  )
+}
+
+function confirmStyle(anchor: HTMLButtonElement | null): { left: number; top: number } {
+  const rect = anchor?.getBoundingClientRect()
+  if (!rect) return { left: 16, top: 16 }
+  const width = 224
+  const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))
+  return { left, top: Math.max(8, rect.top - 8) }
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 7h16M9 7V5h6v2M8 7l1 12h6l1-12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
@@ -317,7 +399,7 @@ function Drawer({ project, aiAvailable, onClose, onSaved }: { project: Project |
             {!aiAvailable && <p className="mt-1 text-[11px] text-[#9aa7ba]">{copy.aiOffRefine}</p>}
             <label className="mt-2 block">
               <span className="sr-only">{copy.bullet}</span>
-              <textarea className="h-28 w-full rounded-lg border border-[#dbe6ff] p-2 text-[12.5px]" value={draft.resumeBullet} onChange={(event) => setDraft({ ...draft, resumeBullet: event.target.value })} />
+              <textarea className="h-28 w-full rounded-lg border border-[#dbe6ff] p-2 text-[12.5px]" placeholder={copy.bulletHint} value={draft.resumeBullet} onChange={(event) => setDraft({ ...draft, resumeBullet: event.target.value })} />
             </label>
           </div>
         </div>

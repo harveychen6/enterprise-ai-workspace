@@ -33,7 +33,13 @@ export function importBackup(payload: ReturnType<typeof exportBackup>, confirm: 
   const sqlite = getSqlite()
   const run = sqlite.transaction(() => {
     sqlite.exec('DELETE FROM resume_items; DELETE FROM sync_proposals; DELETE FROM job_matches; DELETE FROM job_keywords; DELETE FROM resumes; DELETE FROM job_targets; DELETE FROM projects;')
-    if (payload.profile) db.update(profile).set(payload.profile).where(eq(profile.id, 1)).run()
+    if (payload.profile) {
+      db.update(profile).set({
+        ...payload.profile,
+        workExperience: payload.profile.workExperience ?? '',
+        photo: payload.profile.photo ?? '',
+      }).where(eq(profile.id, 1)).run()
+    }
     for (const row of payload.projects ?? []) db.insert(projects).values(row).run()
     for (const row of payload.jobs ?? []) db.insert(jobTargets).values(row).run()
     for (const row of payload.keywords ?? []) db.insert(jobKeywords).values(row).run()
@@ -125,7 +131,7 @@ export function getProfile() {
   return row
 }
 
-export function updateProfile(patch: Partial<{ name: string; headline: string; years: string; location: string; phone: string; email: string; links: string; summary: string; education: string; skills: string[] }>) {
+export function updateProfile(patch: Partial<{ name: string; headline: string; years: string; location: string; phone: string; email: string; links: string; summary: string; education: string; skills: string[]; workExperience: string; photo: string }>) {
   const current = getProfile()
   if (!current) return null
   getDb().update(profile).set({
@@ -139,6 +145,8 @@ export function updateProfile(patch: Partial<{ name: string; headline: string; y
     summary: patch.summary ?? current.summary,
     education: patch.education ?? current.education,
     skillsJson: patch.skills ? JSON.stringify(patch.skills) : current.skillsJson,
+    workExperience: patch.workExperience ?? current.workExperience,
+    photo: patch.photo ?? current.photo,
   }).where(eq(profile.id, 1)).run()
   return getProfile()
 }

@@ -9,3 +9,12 @@ export function toMonthInput(value: string): string {
 export function isOngoing(value: string): boolean {
   return value.trim() === '至今'
 }
+
+export function formatResumePeriod(start: string, end: string): string {
+  const show = (value: string) => {
+    if (!value || value === '至今') return value
+    const month = toMonthInput(value)
+    return month ? month.replace('-', '.') : value
+  }
+  return [show(start), show(end)].filter(Boolean).join(' - ')
+}

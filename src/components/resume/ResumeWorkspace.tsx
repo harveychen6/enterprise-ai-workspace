@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { ResumeSheet } from '@/components/resume/ResumeSheet'
 import { copy } from '@/content/zh-CN'
 import { api, notifyChanged, statusLabel } from '@/lib/api'
 
@@ -31,7 +32,7 @@ interface ResumeDetail {
   type: 'master' | 'targeted'
   summary: string
   job: { company: string; role: string } | null
-  profile: { name: string; headline: string; years: string; location: string; phone: string; email: string; links: string; education: string; skills: string[] } | null
+  profile: { name: string; headline: string; years: string; location: string; phone: string; email: string; links: string; education: string; skills: string[]; workExperience: string; photo: string } | null
   projects: ResumeProject[]
 }
 
@@ -113,35 +114,26 @@ export function ResumeWorkspace() {
             <span>{copy.preview}</span>
             <span className="ml-2 rounded border px-1.5 text-[10px] text-[#8b98ab]">A4</span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[#e3e8f0] bg-[#e9edf3]/60 p-3">
-            <article className="mx-auto min-h-[660px] rounded-lg bg-white px-7 py-6 shadow-md">
-              <h1 className="text-[21px] font-semibold">{resume.profile?.name || copy.emptyName}</h1>
-              <p className="mt-1 text-[10.5px] text-[#8b98ab]">{[resume.profile?.headline, resume.profile?.years].filter(Boolean).join(' · ')}</p>
-              <p className="mt-1 text-[10.5px] text-[#7c8899]">{[resume.profile?.location, resume.profile?.phone, resume.profile?.email, resume.profile?.links].filter(Boolean).join(' · ')}</p>
-              {resume.job && <p className="mt-2 inline-block rounded border border-[#dbe6ff] bg-[#eef3ff] px-1.5 text-[9.5px] text-[#2f6bff]">投递：{resume.job.company} · {resume.job.role}</p>}
-              <h2 className="mt-4 text-[11px] font-semibold tracking-widest text-[#2f6bff]">个人简介</h2>
-              <p className="mt-1 text-[11px] leading-7" contentEditable={resume.type === 'targeted'} suppressContentEditableWarning onBlur={(event) => {
-                if (resume.type !== 'targeted') return
-                void api(`/api/resumes/${resume.id}`, { method: 'PATCH', body: JSON.stringify({ summary: event.currentTarget.textContent ?? '' }) }).then((next) => setResume(next as ResumeDetail))
-              }}>{resume.summary}</p>
-              <h2 className="mt-3 text-[11px] font-semibold tracking-widest text-[#2f6bff]">项目经历</h2>
-              {included.map((project) => (
-                <div key={project.projectId} className="mt-2">
-                  <p className="text-[12px] font-medium">{project.title}</p>
-                  <p className="text-[10px] text-[#9aa7ba]">{[project.org, [project.periodStart, project.periodEnd].filter(Boolean).join(' — ')].filter(Boolean).join(' · ')}</p>
-                  <p className="text-[11px] leading-7" contentEditable={resume.type === 'targeted'} suppressContentEditableWarning onBlur={(event) => {
-                    if (resume.type !== 'targeted') return
-                    void api(`/api/resumes/${resume.id}`, { method: 'PATCH', body: JSON.stringify({ overrides: [{ projectId: project.projectId, bulletOverride: event.currentTarget.textContent ?? '' }] }) }).then((next) => setResume(next as ResumeDetail))
-                  }}>{project.bullet}</p>
-                </div>
-              ))}
-              <h2 className="mt-3 text-[11px] font-semibold tracking-widest text-[#2f6bff]">技术栈</h2>
-              <p className="mt-1 text-[11px]">{resume.profile?.skills.join('、')}</p>
-              <h2 className="mt-3 text-[11px] font-semibold tracking-widest text-[#2f6bff]">教育经历</h2>
-              <p className="mt-1 text-[11px]">{resume.profile?.education}</p>
-              <p className="mt-4 text-center text-[9px] text-[#c2cbd8]">{resume.type === 'master' ? copy.masterReadonly : copy.editTip}</p>
-            </article>
-          </div>
+          <ScaledResume>
+            {resume.profile && (
+              <ResumeSheet
+                profile={resume.profile}
+                job={resume.job}
+                projects={included}
+                editable={resume.type === 'targeted'}
+                onBullet={(projectId, bulletOverride) => {
+                  if (resume.type !== 'targeted') return
+                  void api(`/api/resumes/${resume.id}`, { method: 'PATCH', body: JSON.stringify({ overrides: [{ projectId, bulletOverride }] }) }).then((next) => setResume(next as ResumeDetail))
+                }}
+                onPhoto={(photo) => {
+                  void api('/api/profile', { method: 'PATCH', body: JSON.stringify({ photo }) }).then(() => {
+                    setResume((current) => current?.profile ? { ...current, profile: { ...current.profile, photo } } : current)
+                  })
+                }}
+              />
+            )}
+          </ScaledResume>
+          <p className="px-1 pt-1 text-center text-[9px] text-[#c2cbd8]">{resume.type === 'master' ? copy.masterReadonly : copy.editTip}</p>
           <div className="mt-2 flex justify-end gap-2">
             <a className="flex h-8 items-center rounded-lg border px-3 text-[11.5px]" href={`/api/resumes/${resume.id}/markdown`}>{copy.exportMd}</a>
             <a className="flex h-8 items-center rounded-lg bg-[#2f6bff] px-3 text-[11.5px] text-white" href={`/resume/${resume.id}/print?autoprint=1`} target="_blank">{copy.exportPdf}</a>
@@ -152,14 +144,67 @@ export function ResumeWorkspace() {
   )
 }
 
+function ScaledResume({ children }: { children: ReactNode }) {
+  const frame = useRef<HTMLDivElement>(null)
+  const paper = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState({ scale: 0.52, height: 584 })
+  useEffect(() => {
+    const node = frame.current
+    const sheet = paper.current
+    if (!node || !sheet) return
+    const update = () => {
+      const style = getComputedStyle(node)
+      const available = node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      const scale = available / (sheet.scrollWidth || 794)
+      setBox({ scale, height: sheet.scrollHeight * scale })
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(node)
+    observer.observe(sheet)
+    return () => observer.disconnect()
+  }, [children])
+  return (
+    <div ref={frame} className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-[#e3e8f0] bg-[#eef0f3] p-3">
+      <div className="overflow-hidden" style={{ width: '100%', height: box.height }}>
+        <div ref={paper} style={{ width: 794, transform: `scale(${box.scale})`, transformOrigin: 'top left' }}>{children}</div>
+      </div>
+    </div>
+  )
+}
+
 function ProfileForm({ initial, summary, onSaved }: { initial: NonNullable<ResumeDetail['profile']>; summary: string; onSaved: (summary: string) => void }) {
-  const [form, setForm] = useState({ ...initial, summary, skillsText: initial.skills.join('、') })
+  const [form, setForm] = useState({
+    name: initial.name,
+    headline: initial.headline,
+    years: initial.years,
+    location: initial.location,
+    phone: initial.phone,
+    email: initial.email,
+    links: initial.links,
+    summary,
+    education: initial.education,
+    workExperience: initial.workExperience,
+    skillsText: initial.skills.join('\n'),
+  })
   return (
     <form className="mx-5 mb-2 grid grid-cols-4 gap-2 rounded-xl border bg-white p-3 text-[12px]" onSubmit={async (event) => {
       event.preventDefault()
       await api('/api/profile', {
         method: 'PATCH',
-        body: JSON.stringify({ ...form, skills: form.skillsText.split(/[、,，]/).map((item) => item.trim()).filter(Boolean) }),
+        body: JSON.stringify({
+          name: form.name,
+          headline: form.headline,
+          years: form.years,
+          location: form.location,
+          phone: form.phone,
+          email: form.email,
+          links: form.links,
+          summary: form.summary,
+          education: form.education,
+          workExperience: form.workExperience,
+          skills: form.skillsText.split('\n').map((item) => item.trim()).filter(Boolean),
+        }),
       })
       onSaved(form.summary)
     }}>
@@ -169,10 +214,10 @@ function ProfileForm({ initial, summary, onSaved }: { initial: NonNullable<Resum
       <input className="rounded border px-2 py-1" placeholder={copy.location} value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} />
       <input className="rounded border px-2 py-1" placeholder={copy.phone} value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
       <input className="rounded border px-2 py-1" placeholder={copy.email} value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-      <input className="rounded border px-2 py-1" placeholder={copy.links} value={form.links} onChange={(event) => setForm({ ...form, links: event.target.value })} />
-      <input className="rounded border px-2 py-1" placeholder={copy.skillsHint} value={form.skillsText} onChange={(event) => setForm({ ...form, skillsText: event.target.value })} />
-      <input className="col-span-2 rounded border px-2 py-1" placeholder={copy.summary} value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />
-      <input className="col-span-2 rounded border px-2 py-1" placeholder={copy.education} value={form.education} onChange={(event) => setForm({ ...form, education: event.target.value })} />
+      <input className="col-span-2 rounded border px-2 py-1" placeholder={copy.links} value={form.links} onChange={(event) => setForm({ ...form, links: event.target.value })} />
+      <textarea className="col-span-4 min-h-16 rounded border px-2 py-1" placeholder={copy.workExperienceHint} value={form.workExperience} onChange={(event) => setForm({ ...form, workExperience: event.target.value })} />
+      <textarea className="col-span-2 min-h-16 rounded border px-2 py-1" placeholder={`${copy.skills}，${copy.skillsHint}`} value={form.skillsText} onChange={(event) => setForm({ ...form, skillsText: event.target.value })} />
+      <textarea className="col-span-2 min-h-16 rounded border px-2 py-1" placeholder={copy.educationHint} value={form.education} onChange={(event) => setForm({ ...form, education: event.target.value })} />
       <button className="h-8 rounded bg-[#2f6bff] text-white">保存档案</button>
     </form>
   )

@@ -12,7 +12,7 @@ export function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const body = await request.json() as { name?: string; headline?: string; years?: string; location?: string; phone?: string; email?: string; links?: string; summary?: string; education?: string; skills?: string[] }
+    const body = await request.json() as { name?: string; headline?: string; years?: string; location?: string; phone?: string; email?: string; links?: string; summary?: string; education?: string; skills?: string[]; workExperience?: string; photo?: string }
     return json(updateProfile(body))
   } catch (error) {
     return fail(error)
